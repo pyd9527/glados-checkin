@@ -1,0 +1,64 @@
+name: auto check
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+    paths-ignore:
+      - 'README.md'
+      - 'imgs/**'
+  schedule:
+    # 每天北京时间 09:18 与 12:18 各签到一次（UTC 01:18 / 04:18）
+    - cron: '18 1,4 * * *'
+
+jobs:
+  build:
+    name: glados/railgun checkin
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      actions: write
+
+    strategy:
+      matrix:
+        python-version: [3.13]
+
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests
+          pip install pypushdeer
+
+      - name: Running checkin
+        run: |
+          python checkin.py
+        env:
+          PUSHDEER_SENDKEY: ${{ secrets.PUSHDEER_SENDKEY }}
+          GLADOS_COOKIES: ${{ secrets.GLADOS_COOKIES }}
+          GLADOS_EXCHANGE_PLAN: ${{ secrets.GLADOS_EXCHANGE_PLAN }}
+          GLADOS_VERBOSE: ${{ secrets.GLADOS_VERBOSE }}
+
+      - name: Keep alive
+        uses: liskin/gh-workflow-keepalive@v1
+
+      - name: Delete workflow runs
+        uses: Mattraks/delete-workflow-runs@v2
+        with:
+          token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          retain_days: 7
+          keep_minimum_runs: 7
+          delete_run_by_conclusion_pattern: success
